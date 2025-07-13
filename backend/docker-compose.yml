@@ -1,0 +1,58 @@
+name: everlab-backend-development
+
+volumes:
+  db-data:
+
+networks:
+  everlab-backend:
+    driver: bridge
+
+services:
+  everlab-backend:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      # Only will build development stage from our dockerfile
+      target: development
+    volumes:
+      - .:/app
+    networks:
+      - everlab-backend
+    entrypoint: ["tail", "-f", "/dev/null"]
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "${PORT}:${PORT}"
+      - "${DOCKER_APP_DEBUG_PORT:-0}:9229"
+
+  db:
+    image: mysql:8.3
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCKER_MYSQL_ROOT_PASSWORD}
+    networks:
+      - everlab-backend
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    ports:
+      - "${DOCKER_PHPMYADMIN_PORT:-9095}:80"
+    networks:
+      - everlab-backend
+    environment:
+      - UPLOAD_LIMIT=1G
+      - MYSQL_ROOT_PASSWORD=${DOCKER_MYSQL_ROOT_PASSWORD}
+      - PMA_HOST=db
+      - PMA_PORT=3306
+      - PMA_ARBITRARY=1
+      - PMA_PMADB=pmadb
